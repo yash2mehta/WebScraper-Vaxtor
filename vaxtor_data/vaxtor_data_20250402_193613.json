@@ -1,0 +1,37 @@
+[
+  {
+    "Plate":"SJM764S",
+    "Make":null,
+    "Model":null
+  },
+  {
+    "Plate":"SKR9859E",
+    "Make":null,
+    "Model":null
+  },
+  {
+    "Plate":"GT5159L",
+    "Make":"Toyota",
+    "Model":"Corolla"
+  },
+  {
+    "Plate":"GT0199C",
+    "Make":"Toyota",
+    "Model":"Corolla"
+  },
+  {
+    "Plate":"SGT519E",
+    "Make":"Toyota",
+    "Model":"Corolla"
+  },
+  {
+    "Plate":"GT513C",
+    "Make":"Toyota",
+    "Model":"Corolla"
+  },
+  {
+    "Plate":"SGT01J",
+    "Make":"Toyota",
+    "Model":"Corolla"
+  }
+]
