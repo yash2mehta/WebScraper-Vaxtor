@@ -20,7 +20,8 @@ from pprint import pprint
 VAXTOR_URL = "http://169.254.206.95/local/Vaxreader/index.html#/"
 DATA_DIR = "vaxtor_data"  # Directory to store data files
 IMAGES_DIR = "Vaxtor_Images"  # Directory to store images
-API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"  # PlateRecognizer API token
+# OLD_API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"  # PlateRecognizer API token
+API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"  # PlateRecognizer API token - Premium
 
 # Create data and images directories if they don't exist
 for directory in [DATA_DIR, IMAGES_DIR]:
@@ -593,7 +594,7 @@ def send_to_local_endpoint(plate, make, model):
         model: str, vehicle model
     """
     try:
-        url = "http://127.0.0.1:5000/platerecognizer-alpr"
+        url = "http://13.54.166.90:5000/platerecognizer-alpr"
         data = {
             "plate": plate,
             "make": make,
@@ -631,7 +632,7 @@ def send_to_local_endpoint(plate, make, model):
     except requests.exceptions.Timeout:
         print("❌ Request timed out after 5 seconds")
     except requests.exceptions.ConnectionError:
-        print("❌ Connection error - Is the server running at http://127.0.0.1:5000?")
+        print(f"❌ Connection error - Is the server running at {url}?")
     except requests.exceptions.RequestException as e:
         print(f"❌ Error sending request: {str(e)}")
     except Exception as e:
@@ -684,16 +685,21 @@ def process_new_data(changed_df, force_recognition=False):
                         pprint(result)
                         
                         # Extract make and model from recognition results
-                        # make_pr = result.get('make', most_recent.get('Make', 'None'))
-                        # model_pr = result.get('model', most_recent.get('Model', 'None'))
+                        # If PlateRecognizer doesn't recognize make/model, use defaults
+                        make = result.get('make', 'Toyota')  # Default to Toyota if not recognized
+                        model = result.get('model', 'Corolla')  # Default to Corolla if not recognized
                         
-                        # Send data to local endpoint
-                        send_to_local_endpoint(plate_number, make = "Test_Make", model = "Test_Model")
+                        # Send data to local endpoint with either recognized or default values
+                        send_to_local_endpoint(plate_number, make, model)
                     else:
                         print("❌ Failed to get plate recognition results")
+                        # Use default values if recognition fails
+                        send_to_local_endpoint(plate_number, "Toyota", "Corolla")
                         
                 except Exception as e:
                     print(f"❌ Error processing plate recognition: {str(e)}")
+                    # Use default values if there's an error
+                    send_to_local_endpoint(plate_number, "Toyota", "Corolla")
             else:
                 print(f"❌ Image not found for plate: {plate_number}")
         else:
