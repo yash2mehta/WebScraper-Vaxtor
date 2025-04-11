@@ -18,35 +18,26 @@ from pprint import pprint
 
 # --- Config ---
 VAXTOR_URL = "http://169.254.206.95/local/Vaxreader/index.html#/"
-DATA_DIR = "vaxtor_data"  # Directory to store data files
-IMAGES_DIR = "Vaxtor_Images"  # Directory to store images
-# OLD_API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"  # PlateRecognizer API token
-API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"  # PlateRecognizer API token - Premium
+DATA_DIR = "vaxtor_data"
+IMAGES_DIR = "Vaxtor_Images"
+API_TOKEN = "210ed0449ee06e8d9bcee4a67c742814e4e7366e"
 
-# Create data and images directories if they don't exist
 for directory in [DATA_DIR, IMAGES_DIR]:
     if not os.path.exists(directory):
         os.makedirs(directory)
 
 def download_image(driver, url, plate_number):
-    """Download image using Selenium's session"""
     try:
-        # Clean plate number to make it a valid filename
         clean_plate = re.sub(r'[<>:"/\\|?*]', '', plate_number)
         filename = f"{clean_plate}.jpg"
         filepath = os.path.join(IMAGES_DIR, filename)
         
-        # If file already exists, skip download
         if os.path.exists(filepath):
-            # print(f"ℹ️ Image for plate {plate_number} already exists")
             return True
             
-        # Use Selenium to get the image data
         driver.get(url)
-        # Get the page source which should contain the image data
         img_element = driver.find_element(By.TAG_NAME, "img")
         if img_element:
-            # Get the image as PNG screenshot
             img_element.screenshot(filepath)
             print(f"✅ Downloaded image for plate {plate_number}")
             return True
@@ -64,9 +55,7 @@ class BrowserSession:
         self.setup_browser()
     
     def setup_browser(self):
-        """Initialize the browser once"""
         try:
-            # First, make sure any existing driver is properly closed
             if self.driver:
                 try:
                     self.driver.quit()
@@ -79,7 +68,6 @@ class BrowserSession:
             options.add_argument("--no-sandbox")
             options.add_argument("--headless")
             options.add_argument("--window-size=1920,1080")
-            # Add additional options to improve stability
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-browser-side-navigation")
             options.add_argument("--disable-features=VizDisplayCompositor")
@@ -87,7 +75,6 @@ class BrowserSession:
             self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
             print("✅ Browser initialized successfully")
             
-            # Initial login
             if not self.initial_login():
                 raise Exception("Failed to perform initial login")
                 
@@ -96,7 +83,6 @@ class BrowserSession:
             self.driver = None
     
     def force_recreate_session(self):
-        """Force recreation of the entire browser session"""
         print("🔄 Forcing complete session recreation...")
         try:
             if self.driver:
@@ -106,7 +92,6 @@ class BrowserSession:
                     pass
                 self.driver = None
             
-            # Small delay before recreating
             time.sleep(2)
             self.setup_browser()
             return self.driver is not None
@@ -116,16 +101,13 @@ class BrowserSession:
             return False
     
     def check_session_valid(self):
-        """Check if the current session is valid"""
         try:
-            # Try to execute a simple JavaScript to check session
             self.driver.execute_script("return document.readyState")
             return True
         except:
             return False
     
     def refresh_and_get_data(self):
-        """Refresh page and get new data"""
         max_retries = 3
         retry_delay = 5
         
@@ -133,24 +115,19 @@ class BrowserSession:
             try:
                 print(f"\n🔄 Refresh attempt {attempt + 1} of {max_retries}")
                 
-                # First check if session is valid
                 if not self.check_session_valid():
                     print("⚠️ Session invalid, attempting recreation...")
                     if not self.force_recreate_session():
                         raise Exception("Failed to recreate session")
                     print("✅ Session recreated successfully")
                 
-                # Try to refresh the page
                 self.driver.refresh()
                 
-                # Wait for data to load after refresh
                 try:
-                    # First wait for the page to be in ready state
                     WebDriverWait(self.driver, 30).until(
                         lambda driver: driver.execute_script("return document.readyState") == "complete"
                     )
                     
-                    # Then wait for specific elements
                     WebDriverWait(self.driver, 60).until(
                         EC.presence_of_element_located((By.XPATH, "//h3[contains(text(), 'Plates')]"))
                     )
@@ -163,16 +140,13 @@ class BrowserSession:
                     
                 except Exception as wait_error:
                     print(f"⚠️ Wait error: {str(wait_error)}")
-                    # If waiting fails, try to recreate session
                     if self.force_recreate_session():
                         continue
                     else:
                         raise Exception("Failed to recover after wait error")
                 
-                # Give extra time for data to load
                 time.sleep(5)
                 
-                # Get the page source with new data
                 return BeautifulSoup(self.driver.page_source, "lxml")
                 
             except Exception as e:
@@ -182,7 +156,6 @@ class BrowserSession:
                     print(f"⏳ Waiting {retry_delay} seconds before retry...")
                     time.sleep(retry_delay)
                     
-                    # Try complete session recreation before next attempt
                     if not self.force_recreate_session():
                         print("❌ Failed to recreate session")
                         continue
@@ -190,7 +163,6 @@ class BrowserSession:
         return None
     
     def initial_login(self):
-        """Perform initial login"""
         max_retries = 3
         retry_delay = 5
         
@@ -204,12 +176,10 @@ class BrowserSession:
                 
                 self.driver.get(auth_url)
                 
-                # Wait for page to load completely
                 WebDriverWait(self.driver, 30).until(
                     lambda driver: driver.execute_script("return document.readyState") == "complete"
                 )
                 
-                # Additional wait to ensure authentication is complete
                 time.sleep(3)
                 return True
                 
@@ -221,26 +191,22 @@ class BrowserSession:
         return False
     
     def quit(self):
-        """Close the browser"""
         try:
             if self.driver:
                 self.driver.quit()
                 print("✅ Browser closed")
         except Exception as e:
             print(f"⚠️ Error closing browser: {str(e)}")
-            # Force quit if normal quit fails
             try:
                 self.driver.quit()
             except:
                 pass
 
 def check_table_data(soup):
-    """Check if table has data"""
     table = soup.find("table", class_="table table-bordered table-hover table-condensed")
     if not table:
         return False
     
-    # Check if there are any non-hidden rows in tbody
     tbody = table.find("tbody")
     if not tbody:
         return False
@@ -255,32 +221,27 @@ def scrape_data(max_retries=3, retry_delay=5):
         try:
             print(f"\nAttempt {attempt + 1} of {max_retries}")
             
-            # Setup Chrome
             options = Options()
             options.add_argument("--disable-gpu")
             options.add_argument("--no-sandbox")
             
             driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
             
-            # Handle login
             if not handle_login(driver):
                 driver.quit()
                 continue
             
-            # Wait for Plates section
             try:
                 WebDriverWait(driver, 60).until(
                     EC.presence_of_element_located((By.XPATH, "//h3[contains(text(), 'Plates')]"))
                 )
                 print("✅ 'Plates' section loaded.")
                 
-                # Additional wait for table data
                 WebDriverWait(driver, 30).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "tbody tr"))
                 )
                 print("✅ Table rows found.")
                 
-                # Extra delay to ensure data is loaded
                 time.sleep(5)
                 
             except Exception as e:
@@ -288,11 +249,9 @@ def scrape_data(max_retries=3, retry_delay=5):
                 driver.quit()
                 continue
             
-            # Parse page
             soup = BeautifulSoup(driver.page_source, "lxml")
             driver.quit()
             
-            # Verify table has data
             if not check_table_data(soup):
                 print("❌ No data found in table, retrying...")
                 time.sleep(retry_delay)
@@ -302,10 +261,9 @@ def scrape_data(max_retries=3, retry_delay=5):
             
             table = soup.find("table", class_="table table-bordered table-hover table-condensed")
             
-            # Extract headers and their positions
             target_headers = ['Plate', 'Make', 'Model']
             headers = []
-            header_indices = {}  # Store position of each target header
+            header_indices = {}
             
             for i, th in enumerate(table.find("thead").find_all("th")):
                 header_text = th.get_text(strip=True)
@@ -317,19 +275,17 @@ def scrape_data(max_retries=3, retry_delay=5):
             print(headers)
             print("Header positions:", header_indices)
             
-            # Extract rows
             data_rows = []
             for tr in table.find("tbody").find_all("tr", recursive=False):
                 if tr.get("hidden"):
                     continue
                 
                 all_cells = tr.find_all("td", recursive=False)
-                if not all_cells:  # Skip if row has no cells
+                if not all_cells:
                     continue
                     
                 try:
                     row_data = []
-                    # Extract data for each target header
                     for header in headers:
                         index = header_indices[header]
                         if index < len(all_cells):
@@ -337,16 +293,16 @@ def scrape_data(max_retries=3, retry_delay=5):
                             text = td.get_text(strip=True)
                             
                             if header == 'Plate':
-                                if not text:  # Skip row if plate is empty
+                                if not text:
                                     continue
-                            else:  # Make and Model
+                            else:
                                 text = None if not text else text
                                 
                             row_data.append(text)
                         else:
                             row_data.append(None)
                     
-                    if row_data and row_data[0]:  # Only add if we have a plate number
+                    if row_data and row_data[0]:
                         data_rows.append(row_data)
                         
                 except Exception as e:
@@ -358,16 +314,14 @@ def scrape_data(max_retries=3, retry_delay=5):
                 time.sleep(retry_delay)
                 continue
                 
-            # Create DataFrame
             df = pd.DataFrame(data_rows, columns=headers)
             
-            # Replace empty strings with None/NaN in Make and Model columns
             if 'Make' in df.columns:
                 df['Make'] = df['Make'].replace('', pd.NA)
             if 'Model' in df.columns:
                 df['Model'] = df['Model'].replace('', pd.NA)
             
-            return df  # Successful execution
+            return df
             
         except Exception as e:
             print(f"❌ Error during attempt {attempt + 1}: {str(e)}")
@@ -378,7 +332,6 @@ def scrape_data(max_retries=3, retry_delay=5):
     return None
 
 def save_data(df, timestamp):
-    """Save data to CSV and JSON with timestamp"""
     if df is not None and not df.empty:
         filename = f"vaxtor_data_{timestamp}"
         df.to_csv(f"{DATA_DIR}/{filename}.csv", index=False)
@@ -387,7 +340,6 @@ def save_data(df, timestamp):
     return False
 
 def scrape_data_from_soup(soup, driver):
-    """Extract data from BeautifulSoup object"""
     if not check_table_data(soup):
         print("❌ No data found in table")
         return None
@@ -398,7 +350,6 @@ def scrape_data_from_soup(soup, driver):
     if not table:
         return None
     
-    # Extract headers and their positions
     target_headers = ['Plate', 'Make', 'Model']
     headers = []
     header_indices = {}
@@ -409,7 +360,6 @@ def scrape_data_from_soup(soup, driver):
             headers.append(header_text)
             header_indices[header_text] = i
     
-    # Extract rows
     data_rows = []
     total_rows = len(table.find("tbody").find_all("tr", recursive=False))
     processed_rows = 0
@@ -432,7 +382,6 @@ def scrape_data_from_soup(soup, driver):
             row_data = []
             plate_number = None
             
-            # First get the plate number
             plate_index = header_indices.get('Plate')
             if plate_index is not None and plate_index < len(all_cells):
                 plate_cell = all_cells[plate_index]
@@ -443,7 +392,6 @@ def scrape_data_from_soup(soup, driver):
                 
             print(f"\n📝 Processing plate {plate_number} ({processed_rows}/{total_rows})")
             
-            # Extract data for each target header
             for header in headers:
                 index = header_indices[header]
                 if index < len(all_cells):
@@ -453,14 +401,13 @@ def scrape_data_from_soup(soup, driver):
                     if header == 'Plate':
                         if not text:
                             continue
-                    else:  # Make and Model
+                    else:
                         text = None if not text else text
                         
                     row_data.append(text)
                 else:
                     row_data.append(None)
             
-            # Handle image download
             image_index = None
             for i, th in enumerate(table.find("thead").find_all("th")):
                 if th.get_text(strip=True) == 'Image':
@@ -472,14 +419,13 @@ def scrape_data_from_soup(soup, driver):
                 img_tag = image_cell.find('img')
                 if img_tag and img_tag.get('src'):
                     image_url = img_tag['src']
-                    # Convert relative URL to absolute URL
                     absolute_url = urljoin(VAXTOR_URL, image_url)
                     if download_image(driver, absolute_url, plate_number):
                         successful_images += 1
                     else:
                         failed_images += 1
             
-            if row_data and row_data[0]:  # Only add if we have a plate number
+            if row_data and row_data[0]:
                 data_rows.append(row_data)
                 
         except Exception as e:
@@ -487,7 +433,6 @@ def scrape_data_from_soup(soup, driver):
             failed_images += 1
             continue
     
-    # Print summary
     print(f"\n=== Processing Summary ===")
     print(f"Total rows processed: {processed_rows}")
     print(f"Successful image downloads: {successful_images}")
@@ -497,10 +442,8 @@ def scrape_data_from_soup(soup, driver):
     if not data_rows:
         return None
             
-    # Create DataFrame
     df = pd.DataFrame(data_rows, columns=headers)
     
-    # Replace empty strings with None/NaN
     if 'Make' in df.columns:
         df['Make'] = df['Make'].replace('', pd.NA)
     if 'Model' in df.columns:
@@ -514,20 +457,16 @@ def recognize_license_plate(image_path, token, regions=["sg"], strict_region=Tru
         "Authorization": f"Token {token}"
     }
     
-    # Open the image file
     with open(image_path, "rb") as fp:
-        # Set up the data payload
         data = {
-            "regions": regions,       # Specify relevant regions
-            "mmc": str(mmc).lower()   # Enable make, model, color detection if set to True
+            "regions": regions,
+            "mmc": str(mmc).lower()
         }
         if strict_region:
-            data["config"] = json.dumps({"region": "strict"})  # Enforce strict region matching if needed
+            data["config"] = json.dumps({"region": "strict"})
 
-        # Send request with file upload
         response = requests.post(url, headers=headers, files={"upload": fp}, data=data)
         
-        # Check response status and print results
         if response.status_code == 200 or response.status_code == 201:
             return response.json()
         else:
@@ -535,66 +474,38 @@ def recognize_license_plate(image_path, token, regions=["sg"], strict_region=Tru
             return None
 
 def compare_dataframes(old_df, new_df):
-    """
-    Compare two dataframes and return the changed/new rows
-    Returns: tuple (changed_df, is_different)
-    """
     if old_df is None:
         return new_df, True
     
     if new_df is None:
         return None, False
         
-    # Make sure both dataframes have the same columns
     if set(old_df.columns) != set(new_df.columns):
         print("⚠️ Warning: Dataframes have different columns")
         return new_df, True
     
-    # Sort both dataframes by index to ensure proper comparison
     old_df = old_df.reset_index(drop=True)
     new_df = new_df.reset_index(drop=True)
     
-    # Check if dataframes are identical
     if old_df.equals(new_df):
         return None, False
     
-    # Find rows that are in new_df but not in old_df
     changed_rows = pd.concat([new_df, old_df]).drop_duplicates(keep=False)
     
     return changed_rows, True
 
 def should_process_plate_recognition(row_data, force_recognition=False):
-    """
-    Determine if plate recognition should be performed based on existing data
-    
-    Args:
-        row_data: pandas Series containing the row data
-        force_recognition: bool, if True will always perform recognition regardless of existing data
-        
-    Returns:
-        bool: True if plate recognition should be performed
-    """
     if force_recognition:
         return True
         
-    # Check if either Make or Model is None/NaN/empty string
     is_make_missing = pd.isna(row_data.get('Make')) or str(row_data.get('Make')).strip() == ''
     is_model_missing = pd.isna(row_data.get('Model')) or str(row_data.get('Model')).strip() == ''
     
-    # Return True if either Make or Model is missing
     return is_make_missing or is_model_missing
 
 def send_to_local_endpoint(plate, make, model):
-    """
-    Send plate data to local endpoint
-    
-    Args:
-        plate: str, license plate number
-        make: str, vehicle make
-        model: str, vehicle model
-    """
     try:
-        url = "http://13.54.166.90:5000/platerecognizer-alpr"
+        url = "http://13.238.255.9:5000/platerecognizer-alpr"
         data = {
             "plate": plate,
             "make": make,
@@ -608,20 +519,15 @@ def send_to_local_endpoint(plate, make, model):
         
         print("\n=== Sending POST Request ===")
         print(f"URL: {url}")
-        # print(f"Headers: {headers}")
         print(f"Data: {data}")
-
         print("=======")
         
         response = requests.post(
             url,
             json=data,
             headers=headers,
-            timeout=5  # 5 second timeout
+            timeout=5
         )
-        
-        # print(f"Response Status Code: {response.status_code}")
-        # print(f"Response Content: {response.text}")
         
         if response.status_code == 200 or response.status_code == 201:
             print(f"✅ Post Request of License Plate {plate}, Make {make} and Model {model} has been sent")
@@ -639,13 +545,6 @@ def send_to_local_endpoint(plate, make, model):
         print(f"❌ Unexpected error: {str(e)}")
 
 def process_new_data(changed_df, force_recognition=False):
-    """
-    Process newly detected changes in the data
-    
-    Args:
-        changed_df: DataFrame containing changed/new records
-        force_recognition: bool, if True will perform recognition regardless of existing data
-    """
     if changed_df is None or changed_df.empty:
         return
     
@@ -654,24 +553,20 @@ def process_new_data(changed_df, force_recognition=False):
     print("\nChanged/New Records:")
     print(changed_df)
     
-    # Get the most recent entry (first row)
     if not changed_df.empty:
         most_recent = changed_df.iloc[0]
         plate_number = most_recent['Plate']
         
-        # Check if we should perform recognition - If true, then call Plate Recognition API
         if should_process_plate_recognition(most_recent, force_recognition):
             print(f"\n🔍 Processing plate {plate_number} - Make or Model is missing:")
             print(f"Current Make: {most_recent.get('Make', 'None')}")
             print(f"Current Model: {most_recent.get('Model', 'None')}")
             
-            # Construct image path
             clean_plate = re.sub(r'[<>:"/\\|?*]', '', plate_number)
             image_path = os.path.join(IMAGES_DIR, f"{clean_plate}.jpg")
             
             if os.path.exists(image_path):
                 try:
-                    # Call the plate recognition API
                     result = recognize_license_plate(
                         image_path=image_path,
                         token=API_TOKEN,
@@ -684,22 +579,17 @@ def process_new_data(changed_df, force_recognition=False):
                         print("\n=== Plate Recognition Results ===")
                         pprint(result)
                         
-                        # Extract make and model from recognition results
-                        # If PlateRecognizer doesn't recognize make/model, use defaults
-                        make = result.get('make', 'Toyota')  # Default to Toyota if not recognized
-                        model = result.get('model', 'Corolla')  # Default to Corolla if not recognized
+                        make = result.get('make', 'BMW')
+                        model = result.get('model', 'X5')
                         
-                        # Send data to local endpoint with either recognized or default values
                         send_to_local_endpoint(plate_number, make, model)
                     else:
                         print("❌ Failed to get plate recognition results")
-                        # Use default values if recognition fails
-                        send_to_local_endpoint(plate_number, "Toyota", "Corolla")
+                        send_to_local_endpoint(plate_number, "BMW", "X5")
                         
                 except Exception as e:
                     print(f"❌ Error processing plate recognition: {str(e)}")
-                    # Use default values if there's an error
-                    send_to_local_endpoint(plate_number, "Toyota", "Corolla")
+                    send_to_local_endpoint(plate_number, "BMW", "X5")
             else:
                 print(f"❌ Image not found for plate: {plate_number}")
         else:
@@ -707,7 +597,6 @@ def process_new_data(changed_df, force_recognition=False):
             print(f"Make: {most_recent.get('Make')}")
             print(f"Model: {most_recent.get('Model')}")
             
-            # Send existing data to local endpoint
             send_to_local_endpoint(
                 plate_number,
                 most_recent.get('Make'),
@@ -716,16 +605,7 @@ def process_new_data(changed_df, force_recognition=False):
     
     print("=" * 50)
 
-def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recognition=False):
-    """
-    Continuous scraping with single browser session
-    
-    Args:
-        interval: int, seconds between scrapes
-        max_retries: int, maximum number of retry attempts
-        retry_delay: int, seconds to wait between retries
-        force_recognition: bool, if True will perform recognition regardless of existing data
-    """
+def continuous_scraping(interval=5, max_retries=3, retry_delay=5, force_recognition=False):
     print(f"\n=== Starting continuous scraping (every {interval} seconds) ===")
     print(f"Force recognition mode: {'ON' if force_recognition else 'OFF'}")
     
@@ -749,22 +629,18 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                 print(f"\n=== Attempt {attempt + 1} of {max_retries} ===")
                 
                 try:
-                    # Get fresh data
                     soup = browser.refresh_and_get_data()
                     if not soup:
                         raise Exception("Failed to refresh data")
                     
-                    # Use the common scraping function with browser driver
                     result_df = scrape_data_from_soup(soup, browser.driver)
                     if result_df is None:
                         raise Exception("Failed to extract data")
                     
-                    # Compare with previous data and process changes
                     changed_df, is_different = compare_dataframes(previous_df, result_df)
                     if is_different:
                         process_new_data(changed_df, force_recognition)
                     
-                    # Print the DataFrame
                     print("\n📊 Current DataFrame:")
                     if result_df.empty:
                         print("DataFrame is empty!")
@@ -772,11 +648,9 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                         print(f"Shape: {result_df.shape}")
                         print(result_df)
                     
-                    # If we get here, the scrape was successful
                     success = True
-                    consecutive_failures = 0  # Reset failure counter
+                    consecutive_failures = 0
                     
-                    # Save if data changed
                     if not result_df.empty:
                         if not is_different:
                             print("\nℹ️ No changes in data")
@@ -786,7 +660,7 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                             print("\n✅ New data saved")
                             previous_df = result_df.copy()
                     
-                    break  # Exit retry loop on success
+                    break
                     
                 except Exception as e:
                     print(f"❌ Attempt {attempt + 1} failed: {str(e)}")
@@ -794,7 +668,6 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                         print(f"⏳ Waiting {retry_delay} seconds before retry...")
                         time.sleep(retry_delay)
                     
-                    # Try complete session recreation before next attempt
                     if not browser.force_recreate_session():
                         print("❌ Failed to recreate session")
                         continue
@@ -803,7 +676,6 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                 consecutive_failures += 1
                 print(f"\n⚠️ All {max_retries} attempts failed")
                 
-                # If we have too many consecutive failures, try to recreate browser session
                 if consecutive_failures >= 3:
                     print("⚠️ Multiple consecutive failures detected. Recreating browser session...")
                     browser.quit()
@@ -814,7 +686,7 @@ def continuous_scraping(interval=10, max_retries=3, retry_delay=5, force_recogni
                     consecutive_failures = 0
             
             print(f"\n⏳ Waiting {interval} seconds until next scrape...")
-            print("=" * 50)  # Visual separator between scrapes
+            print("=" * 50)
             time.sleep(interval)
             
     except KeyboardInterrupt:
