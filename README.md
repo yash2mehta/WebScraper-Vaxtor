@@ -120,5 +120,5 @@ Access the following URLs in your browser:
    - http://XX.XX.XX.XX:5000/home/platerecognizer
    - http://XX.XX.XX.XX:5000/platerecognizer-record-latest
 
-## Additional Information
-For more detailed information about the system architecture and implementation, please refer to the source code documentation. For support, please contact the development team.
+---
+*This guide provides a comprehensive overview of the Web Scraper system designed for Vaxtor. For additional support or specific issues, please contact the development team.*
