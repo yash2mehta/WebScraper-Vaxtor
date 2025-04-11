@@ -26,18 +26,35 @@ def process_new_data(changed_df, force_recognition=False):
             print(f"Current Make: {most_recent.get('Make', 'None')}")
             print(f"Current Model: {most_recent.get('Model', 'None')}")
             
+            # Start timing plate recognition
+            plate_recognition_start = time.time()
             make, model = process_plate_recognition(plate_number, force_recognition)
+            plate_recognition_time = time.time() - plate_recognition_start
+            print(f"\n⏱️ Plate recognition took: {plate_recognition_time:.2f} seconds")
+            
+            # Start timing local endpoint
+            local_endpoint_start = time.time()
             send_to_local_endpoint(plate_number, make, model)
+            local_endpoint_time = time.time() - local_endpoint_start
+            print(f"⏱️ Local endpoint took: {local_endpoint_time:.2f} seconds")
+            
+            # Print total time
+            total_time = plate_recognition_time + local_endpoint_time
+            print(f"⏱️ Total processing time: {total_time:.2f} seconds")
         else:
             print(f"\nℹ️ Skipping plate recognition for {plate_number} - both Make and Model exist:")
             print(f"Make: {most_recent.get('Make')}")
             print(f"Model: {most_recent.get('Model')}")
             
+            # Only time local endpoint when skipping plate recognition
+            local_endpoint_start = time.time()
             send_to_local_endpoint(
                 plate_number,
                 most_recent.get('Make'),
                 most_recent.get('Model')
             )
+            local_endpoint_time = time.time() - local_endpoint_start
+            print(f"⏱️ Local endpoint took: {local_endpoint_time:.2f} seconds")
     
     print("=" * 50)
 
